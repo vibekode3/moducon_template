@@ -98,6 +98,17 @@
 		<div class="text-center mb-8">
 			<h1 class="text-4xl font-bold text-gray-800 mb-2">실시간 영어회화 AI</h1>
 			<p class="text-gray-600">OpenAI Realtime API로 자연스러운 영어 대화를 연습해보세요</p>
+			
+			<!-- 대화 기록 페이지 링크 -->
+			<a 
+				href="/history" 
+				class="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-lg transition-colors text-sm font-medium"
+			>
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+				</svg>
+				대화 기록 보기
+			</a>
 		</div>
 		
 		<!-- AI 아바타 -->

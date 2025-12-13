@@ -31,6 +31,8 @@
 		"vitest": "^3.0.0"
 	},
 	"dependencies": {
+		"@supabase/supabase-js": "^2.87.1",
+		"pg": "^8.16.3",
 		"vercel": "^42.3.0"
 	}
 }

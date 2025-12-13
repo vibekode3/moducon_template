@@ -11,8 +11,10 @@
 	export let isSpeaking = false;
 	export let isDisconnecting = false;
 	export let error = null;
+	export let currentSessionId = null; // 현재 세션 ID
 	
 	let debugInfo = [];
+	let isFirstUserMessage = true; // 첫 번째 사용자 메시지 여부
 	
 	// 매니저 인스턴스들
 	let webRTCManager;
@@ -33,8 +35,77 @@
 	// 매니저 초기화
 	function initializeManagers() {
 		webRTCManager = new WebRTCManager(addDebugLog);
-		eventHandler = new RealtimeEventHandler(addDebugLog, dispatch);
+		eventHandler = new RealtimeEventHandler(addDebugLog, dispatchWithSave);
 		connectionManager = new ConnectionManager(addDebugLog);
+	}
+	
+	// 메시지 저장 함수
+	async function saveMessageToDB(speaker, message, timestamp) {
+		if (!currentSessionId) {
+			addDebugLog('⚠️ 세션 ID가 없어 메시지 저장 건너뜀');
+			return;
+		}
+		
+		try {
+			const response = await fetch(`/api/sessions/${currentSessionId}/messages`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ speaker, message, timestamp })
+			});
+			
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || '메시지 저장 실패');
+			}
+			
+			const result = await response.json();
+			addDebugLog('💾 메시지 DB 저장 완료', { messageId: result.message_id, speaker });
+			
+			// 첫 번째 사용자 메시지인 경우 세션 제목이 자동 생성됨
+			if (speaker === '나' && isFirstUserMessage) {
+				isFirstUserMessage = false;
+				addDebugLog('📝 세션 제목 자동 생성됨');
+			}
+		} catch (err) {
+			addDebugLog('❌ 메시지 DB 저장 실패', { error: err.message });
+			// DB 저장 실패해도 UI는 계속 동작
+		}
+	}
+	
+	// dispatch를 래핑하여 메시지 저장 기능 추가
+	function dispatchWithSave(eventName, detail) {
+		dispatch(eventName, detail);
+		
+		// message 이벤트인 경우 DB에 저장
+		if (eventName === 'message' && detail && detail.speaker && detail.message) {
+			// 비동기로 저장 (UI 블로킹 방지)
+			saveMessageToDB(detail.speaker, detail.message, detail.timestamp);
+		}
+	}
+	
+	// 새 세션 생성 함수
+	async function createNewSession() {
+		try {
+			const response = await fetch('/api/sessions', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' }
+			});
+			
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || '세션 생성 실패');
+			}
+			
+			const result = await response.json();
+			currentSessionId = result.session.id;
+			isFirstUserMessage = true;
+			addDebugLog('✅ 새 DB 세션 생성', { sessionId: currentSessionId });
+			return currentSessionId;
+		} catch (err) {
+			addDebugLog('❌ DB 세션 생성 실패', { error: err.message });
+			// 세션 생성 실패해도 WebRTC 연결은 계속 진행
+			return null;
+		}
 	}
 	
 	// 예상치 못한 연결 끊김 처리
@@ -117,6 +188,9 @@
 			const connectionId = connectionManager.generateConnectionId();
 			addDebugLog('🚀 연결 시작', { connectionId });
 			
+			// 0. DB 세션 생성 (비동기, 실패해도 계속 진행)
+			await createNewSession();
+			
 			// 상태 업데이트 및 이벤트 핸들러 차단 상태 초기화
 			if (eventHandler) {
 				eventHandler.resetBlockState(); // 차단 상태 초기화
@@ -190,6 +264,8 @@
 		isConnecting = false;
 		isSpeaking = false;
 		isDisconnecting = false;
+		currentSessionId = null;
+		isFirstUserMessage = true;
 		
 		if (eventHandler) {
 			eventHandler.updateConnectionState(false, false);
@@ -277,6 +353,11 @@
 	// 디버그 정보 내보내기
 	export function getDebugInfo() {
 		return debugInfo;
+	}
+	
+	// 현재 세션 ID 반환
+	export function getCurrentSessionId() {
+		return currentSessionId;
 	}
 	
 	// 컴포넌트 정리
